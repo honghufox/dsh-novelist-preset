@@ -1,0 +1,235 @@
+# 由 make-desktop-bundle.mjs 生成（来源：G:\dsh\_staging\preset-root）。
+# 自包含：预设自带资源在 presets/<id>/ 下，行内 baseUrl 引用已重定位到 bundle 内，
+# 因此整个 bundle 可放在任意路径、任意机器上，无需安装期改写绝对路径。
+# 依赖产物（node_modules）不随仓库分发，安装后按 dsh.install 重建。
+- insert:
+    - id: preset-novelist
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: novelist
+        name: '小说创作模式'
+        description: '面向长篇小说创作的 Agent：完整保留标准模式的编码/检索/编排能力，并叠加以"故事圣经（Story Bible）"为核心的长篇创作方法论——大纲（一句话前提→三幕）、人物卡（目标/动机/冲突/弧光）、世界观设定、逐章写作、伏笔（埋设/回收）管理、一致性验证与快照回滚。配套 Obsidian+Claude 风格的 Narrative Studio 工作区（侧栏入口）。'
+        plugins:
+          # The `novelist` agent preset: the full coding agent from `standard`,
+          # plus a long-form novel-writing persona and a "story bible" methodology
+          # shipped as five skills (outline / character / worldbuilding / chapter /
+          # continuity) under `skills/`, discovered via `customSkillDirs` below.
+          #
+          # This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
+          # standing scope; every session naming it joins by scope parentage, so the
+          # tools and prompt sections registered here cover each joined agent while a
+          # session's own state stays keyed per Session/Agent inside the plugins. The
+          # host composition (`base.cordis.yml` + `web.cordis.yml`) keeps everything a
+          # preset must not own: the registries themselves, the sandbox and approval
+          # stack, persistence, and the model route.
+          #
+          # A service row here MUST sit inside a group carrying an `isolate` realm.
+          # Without one it publishes into the root realm, where it is process-global —
+          # another preset publishing the same name collides, and a host reader would
+          # resolve one preset's instance for every session; `dsh-agent-presets` rejects
+          # that at mount.
+
+          # ── identity ────────────────────────────────────────────────────────────────
+
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You are a long-form fiction writing partner powered by the {{model}} model, running on the DeepSeek Harness. Your working directory is {{cwd}}. You help a novelist produce a complete, publication-quality novel, not isolated scraps.
+
+                你是一个长篇小说创作搭档。服务对象是写长篇（80 万字级，网文或传统皆可）的作者，核心目标是**完稿并保持世界与人物的一致性**。你以「故事圣经（Story Bible）」为工作底座，所有设定沉淀为 Markdown 文档，随写随查、随改随同步。默认用中文写作与交流，除非作者要求其他语言。
+
+                【工作流】严格沿一条流水线推进，每阶段产出对应的故事圣经文档，前一步的输出是后一步的输入：
+                1. 创意构思 → 一句话前提（Logline）、主角与核心冲突列表
+                2. 世界观设定 → worldbuilding/（世界规则、力量体系、地理、历史、组织、文化）
+                3. 大纲 → outline.md（一句话前提 → 三幕/卷结构 → 每章一句话要点），参考雪花法逐层细化
+                4. 人物 → characters/（每主要人物一个 markdown 文件，YAML frontmatter 记录身份、性格、目标、动机、冲突、弧光、关系）
+                5. 逐章写作 → chapters/第NNN章-标题.md 每章一个文件，写作前先做**上下文打包**
+                6. 修订与一致性校验 → continuity-check 技能 + 快照回滚
+
+                【上下文打包（写章必做）】动笔写某一章前，把「本章大纲要点 + 出场人物卡 + 相关世界观条目 + 尚未回收的伏笔」这几块拼接成上下文再写，避免越写越跑偏、设定前后矛盾。首次进入一本书时先用 glob 查看你的 Obsidian 小说库结构，若为空就用 write 建立必需的文档（outline.md、characters/、worldbuilding/、chapters/）。
+
+                【一致性追踪】人物用 YAML 字段卡（姓名/身份/性格核心/目标/动机/冲突/弧光/关系/状态），写时即时更新；设定冲突、时间线矛盾、能力边界漂移都要靠查询故事圣经来避免。
+
+                【伏笔管理】建立伏笔登记（埋设点/回收点/状态），铺设时登记，回收时勾销；写新章节时先检索是否有应回收的伏笔。
+
+                【强制验证与回滚】完成一章后跑一致性清单（人物行为是否符合人设、能力/设定是否越界、前文事实是否冲突、伏笔是否到位），不达标就修订；重大改动先用 write 在 snapshots/ 存一份快照副本，便于随时回滚参考。
+
+                【写作质量红线】明确写成 DO/DON'T 规则：
+                - DO：show, don't tell；用可感细节、动作与对白呈现情绪；对话契合人物身份与性格；每章有推进（冲突升级或转折）；场景有目的。
+                - DON'T：堆砌形容词与套话（「仿佛」「不禁」「伫立良久」「一时间」「心下一惊」等 AI 高频词）、空洞的内心独白、解释性旁白、机械的「他/她」指代、头重脚轻的流水账；不要主动求赞赏，不要每章都总结「本章讲了什么」。
+                - 文风：先复刻作者的风格样本（若提供）再续写；保持用词、称呼、称谓、地名在全书一致；遇到生僻字或专有名词与故事圣经核对后再用。
+
+                【与工具协作】故事圣经是作者在 Obsidian 里维护的 Markdown 小说库（vault）。你直接用常规文件工具读写对应文档：glob 找文件、read 读取、write 新建/覆盖、edit 精确替换、grep 全库检索。不要臆造文件路径，先用 glob/read 确认实际结构；尊重 Obsidian 现有组织（outline 大纲 / characters 人物 / worldbuilding 世界观 / chapters 章节 等），只在既有结构上增补，不破坏作者的组织方式。需要查资料用 web_search；跨章节搬运或审查大块内容可用 subagent 分派。
+
+                用中文与作者沟通；把「已完成的章节/改动」「当前主线进展」「下一步建议」简短交代清楚，不要啰嗦。
+
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+
+          # ── shell ───────────────────────────────────────────────────────────────────
+
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+
+          # ── filesystem ──────────────────────────────────────────────────────────────
+
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+
+          # ── background jobs ────────────────────────────────────────────────────────
+
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+
+          # ── skills ──────────────────────────────────────────────────────────────────
+
+          # The skill REGISTRY lives in the host composition and is layered per scope:
+          # these rows register into THIS preset's layer of it, so they need no realm.
+          # `skill-filesystem` contributes local-root discovery for agents on this preset
+          # and the novel-writing skills shipped inside the preset directory (via
+          # `customSkillDirs`, resolved from `baseUrl` like the shipped `cordis` preset
+          # does), and `tool-skill` gives them the catalog and loader.
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              customSkillDirs:
+                - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('presets/novelist/skills/', baseUrl))"
+
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+
+          # ── goals ───────────────────────────────────────────────────────────────────
+
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+
+          # ── plan mode ───────────────────────────────────────────────────────────────
+
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                        You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                        Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                        The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                        When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response.
+
+          # ── compaction ──────────────────────────────────────────────────────────────
+
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+
+          # ── delegation and workflows ────────────────────────────────────────────────
+
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  backgroundMode: continuable
+
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+                  backgroundMode: continuable
+
+              - id: tool-subagent-codex
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: codex
+                  toolName: subagent_codex
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+
+              - id: tool-subagent-claude-code
+                name: '@deepseek-ai/dsh-tool-subagent'
+                disabled: true
+                config:
+                  provider: claude-code
+                  toolName: subagent_claude_code
+                  backgroundMode: one-shot
+                  maxDepth: provider-managed
+
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+
+              - id: tool-ralph
+                name: '@deepseek-ai/dsh-tool-ralph'
+                config:
+                  subagentProvider: spawn
+                  maxRounds: 64
+
+          # ── remaining model-facing rows ─────────────────────────────────────────────
+
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: false
+              searchTimeoutMs: 60000
